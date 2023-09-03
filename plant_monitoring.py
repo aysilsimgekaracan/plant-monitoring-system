@@ -18,13 +18,12 @@ load_dotenv()
 app = FastAPI()
 
 MONGODB_URL = os.getenv("MONGODB_URL")
-print(MONGODB_URL)
 
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.plant_monitoring
 
-
 # CLASSES
+
 
 class Plant(BaseModel):
     id: str
@@ -64,7 +63,7 @@ class CreateSensorOutput(BaseModel):
 
 @app.get("/")
 def read_root():
-    return {"MONGODB_URL": MONGODB_URL}
+    return {"Hello World": "Hello World"}
 
 
 # START OF ENDPOINTS AND CLASSES FOR PLANT
