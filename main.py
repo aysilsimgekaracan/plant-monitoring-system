@@ -11,6 +11,7 @@ import motor.motor_asyncio
 from bson import ObjectId
 from typing import List
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -23,7 +24,7 @@ client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.plant_monitoring
 
 
-# START OF ENDPOINTS AND CLASSES FOR PLANT
+# CLASSES
 
 class Plant(BaseModel):
     id: str
@@ -41,10 +42,32 @@ class CreatePlant(BaseModel):
     description: str
 
 
+class SensorOutput(BaseModel):
+    id: str
+    plant_id: str
+    timestamp: datetime
+    temperature: float
+    soil_moisture: float
+    light_level: float
+    humidity: float
+
+
+class CreateSensorOutput(BaseModel):
+    plant_id: str
+    temperature: float
+    soil_moisture: float
+    light_level: float
+    humidity: float
+
+# ROOT ENDPOINT
+
+
 @app.get("/")
 def read_root():
     return {"MONGODB_URL": MONGODB_URL}
 
+
+# START OF ENDPOINTS AND CLASSES FOR PLANT
 
 # GET endpoint to retrieve all plants
 @app.get("/GetPlants/", response_description="List all plants", response_model=List[Plant])
@@ -199,3 +222,79 @@ async def create_plant(plant: CreatePlant):
         raise HTTPException(status_code=500, detail=str(e))
 
 # END OF ENDPOINTS AND CLASSES FOR PLANT
+
+
+# START OF ENDPOINTS AND CLASSES FOR SENSOR OUTPUT
+
+
+# GET endpoint to retrieve all sensor outputs by a given plant ID
+
+@app.get("/GetSensorOutputs/", response_description="List all Sensor Outputs By Plant ID", response_model=List[SensorOutput])
+async def get_sensor_outputs(request_body: dict):
+    try:
+        # Use the aggregation framework to convert _id to string
+        plant_id = request_body.get("id")
+
+        # Ensure that the plant_id is provided in the request body
+        if not plant_id:
+            return Response(content="Plant ID not provided in the request body", status_code=status.HTTP_400_BAD_REQUEST)
+
+        # Convert the provided plant_id to an ObjectId
+        plant_object_id = ObjectId(plant_id)
+
+        # Use the aggregation framework to convert _id to string
+        pipeline = [
+            {
+                "$match": {
+                    "plant_id": plant_object_id
+                }
+            },
+            {
+                "$project": {
+                    "id": {
+                        "$toString": "$_id"
+                    },
+                    "plant_id": {
+                        "$toString": "$plant_id"
+                    },
+                    "timestamp": 1,
+                    "temperature": 1,
+                    "soil_moisture": 1,
+                    "light_level": 1,
+                    "humidity": 1
+                }
+            }
+        ]
+
+        # Apply the aggregation pipeline to the collection
+        senor_outputs_cursor: motor.motor_asyncio.AsyncIOMotorCollection = db["sensor_outputs"].aggregate(
+            pipeline)
+        sensor_outputs = await senor_outputs_cursor.to_list(length=None)
+
+        if not sensor_outputs:
+            return Response(content="No sensor values found for the specified plant", status_code=status.HTTP_404_NOT_FOUND)
+
+        return sensor_outputs
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# POST endpoint to add a new plant
+@app.post("/CreateSensorOutput/", response_description="Create a sensor output by a Plant ID", response_model=CreateSensorOutput)
+async def create_sensor_output(sensor_output: CreateSensorOutput):
+    try:
+        plant_id = ObjectId(sensor_output.plant_id)
+
+        new_sensor_output_object = {
+            "plant_id": plant_id,
+            "timestamp": datetime.now().isoformat(),
+            "temperature": sensor_output.temperature,
+            "soil_moisture": sensor_output.soil_moisture,
+            "light_level": sensor_output.light_level,
+            "humidity": sensor_output.humidity
+        }
+
+        new_sensor_output = await db["sensor_outputs"].insert_one(new_sensor_output_object)
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content={"_id": str(new_sensor_output.inserted_id)})
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
