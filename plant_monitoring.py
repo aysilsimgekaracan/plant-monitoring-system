@@ -32,6 +32,13 @@ tags_metadata = [
 
 # CLASSES
 
+class UserCredentials(BaseModel):
+    username: str
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 class Plant(BaseModel):
     id: str
@@ -72,6 +79,60 @@ class CreateSensorOutput(BaseModel):
 @app.get("/")
 def read_root():
     return {"Hello World": "Hello World"}
+
+
+# START OF ENDPOINTS FOR AUTH
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
+
+# Initialize a password context
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Function to create an access token
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)  # Default token expiration
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+# Simulated user data (replace with a database or user management system)
+users_db = {
+    "user1": {
+        "username": "user1",
+        "password": "$2b$12$anHOnfCMWeeyze1lGXtjfu9SHZPupgRzVT9x1N4pHkZ5EmqhuLBr.",
+        "role": "admin",
+    },
+    "user2": {
+        "username": "user2",
+        "password": "$2b$12$fWU2IYCRvSmZ8MT1/V6xM.Jzvc4b9gkkXwMOtH5xk8PnrE/sU.SrK",
+        "role": "user",
+    },
+}
+
+# OAuth2 scheme for token generation
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# FastAPI route to get a token
+@app.post("/token", tags=["Authentication"])
+async def login_for_access_token(token_request: UserCredentials):
+    username = token_request.username
+    password = token_request.password
+
+    # Authenticate the user (you should replace this with your own authentication logic)
+    user = users_db.get(username)
+    if user is None or password != user["password"]:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+
+    # If authentication is successful, you can generate and return a token here
+    # In a real-world scenario, you would use a token library (e.g., PyJWT) to create a JWT token
+    # For simplicity, we'll return a dummy token here
+    access_token = f"fake_access_token_for_{username}"
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 # START OF ENDPOINTS AND CLASSES FOR PLANT
