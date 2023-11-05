@@ -11,7 +11,9 @@ import motor.motor_asyncio
 from bson import ObjectId
 from typing import List
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from passlib.context import CryptContext
 
 load_dotenv()
 
@@ -21,6 +23,12 @@ MONGODB_URL = os.getenv("MONGODB_URL")
 
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 db = client.plant_monitoring
+
+# Define tags for different groups of endpoints
+tags_metadata = [
+    {"name": "Authentication", "description": "Endpoints related to user authentication"},
+    {"name": "Plant Monitoring", "description": "Endpoints related to Plant Monitoring"},
+]
 
 # CLASSES
 
@@ -69,7 +77,7 @@ def read_root():
 # START OF ENDPOINTS AND CLASSES FOR PLANT
 
 # GET endpoint to retrieve all plants
-@app.get("/GetPlants/", response_description="List all plants", response_model=List[Plant])
+@app.get("/GetPlants/", response_description="List all plants", response_model=List[Plant], tags=["Plant Monitoring"])
 async def get_plants():
     try:
         # Use the aggregation framework to convert _id to string
@@ -98,7 +106,7 @@ async def get_plants():
 
 
 # GET endpoint to get a plant
-@app.get("/GetPlant", response_description="Get a plant", response_model=Plant)
+@app.get("/GetPlant", response_description="Get a plant", response_model=Plant, tags=["Plant Monitoring"])
 async def get_plant(request_body: dict):
     try:
         # Use the aggregation framework to convert _id to string
@@ -141,7 +149,7 @@ async def get_plant(request_body: dict):
 
 
 # PUT endpoint to update a plant
-@app.put("/UpdatePlant/", response_description="Update a plant by ID", response_model=Plant)
+@app.put("/UpdatePlant/", response_description="Update a plant by ID", response_model=Plant, tags=["Plant Monitoring"])
 async def update_plant(updated_plant: Plant):
     try:
         plant_id = updated_plant.id
@@ -172,7 +180,7 @@ async def update_plant(updated_plant: Plant):
 
 
 # DELETE endpoint to delete a plant
-@app.delete("/DeletePlant/", response_description="Delete a plant by ID")
+@app.delete("/DeletePlant/", response_description="Delete a plant by ID", tags=["Plant Monitoring"])
 async def delete_plant(request_body: dict):
     try:
         # Use the aggregation framework to convert _id to string
@@ -211,7 +219,7 @@ async def delete_plant(request_body: dict):
 
 
 # POST endpoint to add a new plant
-@app.post("/CreatePlant/", response_description="Add a new plant", response_model=CreatePlant)
+@app.post("/CreatePlant/", response_description="Add a new plant", response_model=CreatePlant, tags=["Plant Monitoring"])
 async def create_plant(plant: CreatePlant):
     try:
         plant = jsonable_encoder(plant)
@@ -228,7 +236,7 @@ async def create_plant(plant: CreatePlant):
 
 # GET endpoint to retrieve all sensor outputs by a given plant ID
 
-@app.get("/GetSensorOutputs/", response_description="List all Sensor Outputs By Plant ID", response_model=List[SensorOutput])
+@app.get("/GetSensorOutputs/", response_description="List all Sensor Outputs By Plant ID", response_model=List[SensorOutput], tags=["Plant Monitoring"])
 async def get_sensor_outputs(request_body: dict):
     try:
         # Use the aggregation framework to convert _id to string
@@ -279,7 +287,7 @@ async def get_sensor_outputs(request_body: dict):
 
 
 # POST endpoint to add a new plant
-@app.post("/CreateSensorOutput/", response_description="Create a sensor output by a Plant ID", response_model=CreateSensorOutput)
+@app.post("/CreateSensorOutput/", response_description="Create a sensor output by a Plant ID", response_model=CreateSensorOutput, tags=["Plant Monitoring"])
 async def create_sensor_output(sensor_output: CreateSensorOutput):
     try:
         plant_id = ObjectId(sensor_output.plant_id)
